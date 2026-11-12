@@ -56,3 +56,10 @@ The learning-curve plot illustrates how the model's prediction error changes dur
 The model weights from this best epoch were restored after training to avoid retaining a later model with worse validation performance.
 
 ![Neural Network Learning Curve](reports/learning_curve.png)
+
+
+| Run                 | Hidden Layers   |   Learning Rate |   Best Epoch |   Validation Loss |   Validation MAE |
+|:--------------------|:----------------|----------------:|-------------:|------------------:|-----------------:|
+| Main                | 64, 32          |          0.001  |          100 |           23.7446 |           3.4244 |
+| Lower Learning Rate | 64, 32          |          0.0005 |          100 |           72.5713 |           5.4695 |
+| Larger Hidden Layer | 128, 32         |          0.001  |           98 |           15.7356 |           2.6661 |
