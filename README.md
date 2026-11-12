@@ -46,3 +46,13 @@ Both baselines are evaluated on the same validation observations as the neural n
 MAE represents the average prediction error in bike rentals, while MSE penalizes larger prediction errors more heavily.
 
 The comparison helps determine whether the additional complexity of a neural network produces a meaningful improvement over simpler regression methods. The held-out test dataset remains untouched until final model evaluation.
+
+### Neural Network Learning Curve
+
+The neural network was trained over multiple epochs, with training loss and validation loss recorded after every epoch.
+
+The learning-curve plot illustrates how the model's prediction error changes during training. The dashed vertical line identifies the epoch with the lowest validation loss.
+
+The model weights from this best epoch were restored after training to avoid retaining a later model with worse validation performance.
+
+![Neural Network Learning Curve](reports/learning_curve.png)
