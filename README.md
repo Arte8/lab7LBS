@@ -32,3 +32,17 @@ After all epochs are completed, the weights corresponding to the lowest validati
 Training and validation loss curves are plotted to assess model convergence and potential overfitting. Validation MAE is also plotted to measure prediction error in units of bike rentals.
 
 The test dataset remains untouched during model training and selection.
+
+### Baseline Model Comparison
+
+Two baseline models were implemented to evaluate the effectiveness of the PyTorch neural network.
+
+The first baseline predicts the mean rental count calculated exclusively from the training dataset. This provides a simple reference model that does not use individual input features.
+
+The second baseline uses scikit-learn's `LinearRegression`, trained on the same preprocessed training features used by the neural network.
+
+Both baselines are evaluated on the same validation observations as the neural network using Mean Absolute Error (MAE) and Mean Squared Error (MSE).
+
+MAE represents the average prediction error in bike rentals, while MSE penalizes larger prediction errors more heavily.
+
+The comparison helps determine whether the additional complexity of a neural network produces a meaningful improvement over simpler regression methods. The held-out test dataset remains untouched until final model evaluation.
