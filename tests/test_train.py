@@ -130,27 +130,66 @@ def test_empty_loader_raises_value_error():
         train.run_epoch(nn.Linear(1, 1), loader, nn.MSELoss())
 
 
+
+
 def test_best_validation_epoch_weights_are_restored(monkeypatch):
     model = nn.Linear(1, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
-    # Simulate successive train/validation epochs. The last epoch is worse.
-    losses = iter([5.0, 2.0, 4.0])
-    saved_best = []
+
+    losses = iter([5.0, 2.0, 4.0, 2.0])
+    saved_weights = []
 
     def fake_run_epoch(model_arg, loader, loss_fn, optimizer=None):
         if optimizer is not None:
             with torch.no_grad():
-                model_arg.weight.fill_(len(saved_best) + 1)
-            saved_best.append(model_arg.weight.detach().clone())
+                value = len(saved_weights) + 1
+                model_arg.weight.fill_(value)
+                model_arg.bias.fill_(value)
+
+            saved_weights.append({
+                name: parameter.detach().clone()
+                for name, parameter in model_arg.named_parameters()
+            })
             return 1.0, 1.0
+
         return next(losses), 1.0
 
     monkeypatch.setattr(train, "run_epoch", fake_run_epoch)
-    history = train.train_model(model, None, None, nn.MSELoss(), optimizer, epochs=3)
-    assert len(history) == 3
-    assert history["val_loss"].tolist() == [5.0, 2.0, 4.0]
-    assert torch.equal(model.weight, saved_best[1])
 
+    history = train.train_model(
+        model,
+        None,
+        None,
+        nn.MSELoss(),
+        optimizer,
+        epochs=3,
+    )
+
+    assert len(history) == 3
+
+    assert {
+        "epoch",
+        "train_loss",
+        "val_loss",
+        "val_mae",
+    }.issubset(history.columns)
+
+    assert history["epoch"].tolist() == [1, 2, 3]
+    assert history["train_loss"].tolist() == [1.0, 1.0, 1.0]
+    assert history["val_loss"].tolist() == [5.0, 2.0, 4.0]
+    assert history["val_mae"].tolist() == [1.0, 1.0, 1.0]
+
+    best_epoch = int(
+        history.loc[history["val_loss"].idxmin(), "epoch"]
+    )
+    assert best_epoch == 2
+
+    for name, parameter in model.named_parameters():
+        assert torch.equal(
+            parameter, saved_weights[1][name]
+        ), f"{name} was not restored correctly"
+
+   
 
 def test_training_mean_and_linear_baselines_use_validation_rows(small_data):
     _, X, y = small_data
