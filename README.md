@@ -131,3 +131,18 @@ python -m pytest -v
 ## Limitations
 
 The dataset is synthetic, so the reported accuracy does not establish performance on real-world bike-share demand. The neural network predicts continuous values rather than enforcing nonnegative integers. The held-out test set has intentionally not been evaluated during model selection; final test performance should be reported only when the assignment calls for that final step.
+
+
+## Required Project Modules and Reports
+
+- `prepare.py`: 60/20/20 split, training-only feature fitting, float32 Dataset and DataLoaders.
+- `model.py`: two ReLU hidden layers and one linear output.
+- `train.py`: custom training loop, baselines, three experiments, figures and final test evaluation.
+- `reports/history.csv`: one row per epoch for the main run.
+- `reports/experiments.csv`: one row per experimental configuration.
+- `reports/learning_curves.png`: training/validation MSE and marked best epoch.
+- `reports/metrics.json`: validation baselines, selected model and one-time held-out test metrics.
+
+Run `python train.py` from the repository root to regenerate all reports with 100 epochs per configuration. The held-out test data is used only after selecting the best configuration by validation MSE. Run `python -m pytest -v` to execute the unit tests, including parametrized architecture cases. Run `python -m ruff check .` for linting. The provided `bikes_data.py` is not modified.
+
+**Reproducibility:** regenerate reports with the full default `python train.py` before committing. A short smoke test using `--epochs 2` produces different results and must not replace the final 100-epoch reports.

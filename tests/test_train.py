@@ -11,7 +11,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
-
+from prepare import (
+    NUMERIC_FEATURES,
+    CATEGORICAL_FEATURES,
+    BikeRentalDataset,
+)
 import train
 from bikes_data import make_rentals
 
@@ -30,7 +34,7 @@ def test_generator_is_deterministic():
 
 def test_generator_schema_and_nonnegative_counts(small_data):
     frame, _, _ = small_data
-    assert set(frame.columns) == set(train.NUMERIC_FEATURES + train.CATEGORICAL_FEATURES + ["rentals"])
+    assert set(frame.columns) == set(NUMERIC_FEATURES + CATEGORICAL_FEATURES + ["rentals"])
     assert (frame["rentals"] >= 0).all()
     assert pd.api.types.is_integer_dtype(frame["rentals"])
 
@@ -48,8 +52,8 @@ def test_split_is_60_20_20_and_disjoint():
 def test_preprocessor_uses_training_data_and_eight_features(small_data):
     _, X, _ = small_data
     preprocessor = ColumnTransformer(
-        [("num", StandardScaler(), train.NUMERIC_FEATURES),
-         ("cat", OneHotEncoder(handle_unknown="ignore"), train.CATEGORICAL_FEATURES)],
+        [("num", StandardScaler(), NUMERIC_FEATURES),
+         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES)],
         sparse_threshold=0,
     )
     transformed = preprocessor.fit_transform(X.iloc[:90])
@@ -70,7 +74,7 @@ def test_network_architecture_and_output_shape(hidden1, hidden2):
 
 
 def test_dataset_returns_float32_single_rows():
-    dataset = train.BikeRentalDataset(np.ones((5, 8)), np.arange(5))
+    dataset = BikeRentalDataset(np.ones((5, 8)), np.arange(5))
     features, target = dataset[0]
     assert len(dataset) == 5
     assert features.shape == (8,)
@@ -79,7 +83,7 @@ def test_dataset_returns_float32_single_rows():
 
 
 def test_loader_shuffling_configuration():
-    dataset = train.BikeRentalDataset(np.ones((10, 8)), np.arange(10))
+    dataset = BikeRentalDataset(np.ones((10, 8)), np.arange(10))
     training = DataLoader(dataset, batch_size=4, shuffle=True)
     validation = DataLoader(dataset, batch_size=4, shuffle=False)
     assert isinstance(training.sampler, RandomSampler)
@@ -87,7 +91,7 @@ def test_loader_shuffling_configuration():
 
 
 def test_evaluation_loss_and_mae_are_sample_weighted():
-    dataset = train.BikeRentalDataset(np.zeros((5, 1)), [1, 2, 3, 4, 5])
+    dataset = BikeRentalDataset(np.zeros((5, 1)), [1, 2, 3, 4, 5])
     loader = DataLoader(dataset, batch_size=2, shuffle=False)
     model = nn.Linear(1, 1)
     with torch.no_grad():
@@ -100,7 +104,7 @@ def test_evaluation_loss_and_mae_are_sample_weighted():
 
 def test_evaluation_does_not_change_weights():
     model = train.BikeRentalNN(8)
-    loader = DataLoader(train.BikeRentalDataset(np.ones((6, 8)), np.arange(6)), batch_size=2)
+    loader = DataLoader(BikeRentalDataset(np.ones((6, 8)), np.arange(6)), batch_size=2)
     before = [parameter.detach().clone() for parameter in model.parameters()]
     train.run_epoch(model, loader, nn.MSELoss())
     assert not model.training
@@ -112,7 +116,7 @@ def test_training_updates_weights():
     with torch.no_grad():
         model.weight.zero_()
         model.bias.zero_()
-    loader = DataLoader(train.BikeRentalDataset(np.ones((8, 1)), np.ones(8)), batch_size=4)
+    loader = DataLoader(BikeRentalDataset(np.ones((8, 1)), np.ones(8)), batch_size=4)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     before = model.weight.detach().clone()
     train.run_epoch(model, loader, nn.MSELoss(), optimizer)
@@ -120,7 +124,7 @@ def test_training_updates_weights():
 
 
 def test_empty_loader_raises_value_error():
-    empty = train.BikeRentalDataset(np.empty((0, 1)), np.empty(0))
+    empty = BikeRentalDataset(np.empty((0, 1)), np.empty(0))
     loader = DataLoader(empty, batch_size=2)
     with pytest.raises(ValueError, match="empty DataLoader"):
         train.run_epoch(nn.Linear(1, 1), loader, nn.MSELoss())
@@ -152,8 +156,8 @@ def test_training_mean_and_linear_baselines_use_validation_rows(small_data):
     _, X, y = small_data
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=train.SEED)
     prep = ColumnTransformer(
-        [("num", StandardScaler(), train.NUMERIC_FEATURES),
-         ("cat", OneHotEncoder(handle_unknown="ignore"), train.CATEGORICAL_FEATURES)],
+        [("num", StandardScaler(), NUMERIC_FEATURES),
+         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES)],
         sparse_threshold=0,
     )
     x_train = prep.fit_transform(X_train)
@@ -173,5 +177,5 @@ def test_plot_files_are_created(tmp_path):
         "val_mae": [2.0, 1.0, 1.5],
     })
     train.plot_learning_curve(history, tmp_path)
-    assert (tmp_path / "learning_curve.png").stat().st_size > 0
+    assert (tmp_path / "learning_curves.png").stat().st_size > 0
     assert (tmp_path / "validation_mae.png").stat().st_size > 0

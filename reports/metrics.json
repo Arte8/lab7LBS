@@ -1,0 +1,46 @@
+{
+  "seed": 42,
+  "epochs_per_run": 100,
+  "rows": {
+    "train": 3600,
+    "validation": 1200,
+    "test": 1200
+  },
+  "selected_model": "Larger Hidden Layer",
+  "selected_hidden_layers": [
+    128,
+    32
+  ],
+  "selected_learning_rate": 0.001,
+  "selected_best_epoch": 89,
+  "selected_validation_mse": 15.343917350769043,
+  "selected_validation_mae": 2.607901719411214,
+  "validation_baselines": {
+    "Neural Network": {
+      "mse": 23.274455922444663,
+      "mae": 3.368730894724528
+    },
+    "Linear Regression": {
+      "mse": 189.090790289319,
+      "mae": 9.316918996774058
+    },
+    "Training Mean": {
+      "mse": 222.3453283179013,
+      "mae": 10.153897222222222
+    }
+  },
+  "test": {
+    "neural_network": {
+      "mse": 13.615966898600261,
+      "mae": 2.4903228378295896
+    },
+    "training_mean": {
+      "mse": 199.8228074845679,
+      "mae": 9.64913935185185
+    },
+    "linear_regression": {
+      "mse": 167.37626971575196,
+      "mae": 8.57291942189252
+    }
+  }
+}

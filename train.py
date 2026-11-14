@@ -2,12 +2,13 @@
 
 Run from the project directory: python train.py
 Requires the instructor-supplied bikes_data.py beside this file.
-Only training/validation rows are evaluated; test rows remain held out.
+The held-out test set is evaluated once after validation-based selection.
 """
 from __future__ import annotations
 
 import argparse
 import copy
+import json
 import random
 from pathlib import Path
 
@@ -17,20 +18,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
 
 from bikes_data import make_rentals
+from model import BikeRentalNN
+from prepare import (
+    SEED,
+    make_loaders, prepare_data,
+)
 
-SEED = 42
-BATCH_SIZE = 32
-NUMERIC_FEATURES = ["hour", "temperature_c", "rain_mm", "wind_kph", "is_weekend"]
-CATEGORICAL_FEATURES = ["station_type"]
 EXPERIMENTS = [
     {"name": "Main", "hidden1": 64, "hidden2": 32, "lr": 0.001},
     {"name": "Lower Learning Rate", "hidden1": 64, "hidden2": 32, "lr": 0.0005},
@@ -48,33 +46,6 @@ def set_seed(seed: int = SEED) -> None:
     if torch.backends.cudnn.is_available():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
-class BikeRentalDataset(Dataset):
-    def __init__(self, X, y):
-        self.X = torch.tensor(np.asarray(X, dtype=np.float32), dtype=torch.float32)
-        self.y = torch.tensor(np.asarray(y, dtype=np.float32).reshape(-1, 1), dtype=torch.float32)
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, index):
-        return self.X[index], self.y[index]
-
-
-class BikeRentalNN(nn.Module):
-    def __init__(self, input_size: int, hidden1: int = 64, hidden2: int = 32):
-        super().__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_size, hidden1),
-            nn.ReLU(),
-            nn.Linear(hidden1, hidden2),
-            nn.ReLU(),
-            nn.Linear(hidden2, 1),
-        )
-
-    def forward(self, x):
-        return self.network(x)
 
 
 def run_epoch(model, loader, loss_fn, optimizer=None):
@@ -157,7 +128,7 @@ def plot_learning_curve(history, reports):
     plt.title("Lakeshore Bike Share - Neural Network Learning Curve")
     plt.legend()
     plt.grid(True, alpha=0.3)
-    save_figure(reports / "learning_curve.png")
+    save_figure(reports / "learning_curves.png")
 
     plt.figure(figsize=(10, 5))
     plt.plot(history["epoch"], history["val_mae"], label="Validation MAE", color="green")
@@ -195,33 +166,26 @@ def main():
     print(df["rentals"].describe().round(2))
     plot_hourly_scatter(df, reports)
 
-    train_df, temp_df = train_test_split(df, test_size=0.40, random_state=SEED)
-    val_df, test_df = train_test_split(temp_df, test_size=0.50, random_state=SEED)
-    X_train, y_train = train_df.drop(columns=["rentals"]), train_df["rentals"]
-    X_val, y_val = val_df.drop(columns=["rentals"]), val_df["rentals"]
-    # Test set is split and reserved, not used for training, selection or reporting.
-    print(f"Rows: train={len(train_df)}, validation={len(val_df)}, held-out test={len(test_df)}")
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", StandardScaler(), NUMERIC_FEATURES),
-            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
-        ],
-        sparse_threshold=0,
+    prepared = prepare_data(df, seed=SEED)
+    y_train, y_val, y_test = (prepared[k] for k in ("y_train", "y_val", "y_test"))
+    X_train_prepared = prepared["X_train"]
+    X_val_prepared = prepared["X_val"]
+    print(
+        f"Rows: train={len(y_train)}, validation={len(y_val)}, "
+        f"held-out test={len(y_test)}"
     )
-    X_train_prepared = preprocessor.fit_transform(X_train)
-    X_val_prepared = preprocessor.transform(X_val)
-    train_dataset = BikeRentalDataset(X_train_prepared, y_train)
-    val_dataset = BikeRentalDataset(X_val_prepared, y_val)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
     loss_fn = nn.MSELoss()
 
-    # Baselines use the exact same validation rows as the neural networks.
+    # Both baselines use exactly the same training and validation rows.
     mean_predictions = np.full(len(y_val), y_train.mean())
     linear_model = LinearRegression()
     linear_model.fit(X_train_prepared, y_train)
     linear_predictions = linear_model.predict(X_val_prepared)
 
+    best_model = None
+    best_config = None
+    best_validation_loss = float("inf")
+    main_baselines = None
     experiment_rows = []
     histories = {}
     for config in EXPERIMENTS:
@@ -229,17 +193,17 @@ def main():
         set_seed()
         # An independent generator ensures identical training batch order for
         # runs with the same number of samples and batch size.
-        shuffle_generator = torch.Generator().manual_seed(SEED)
-        train_loader = DataLoader(
-            train_dataset, batch_size=BATCH_SIZE, shuffle=True,
-            generator=shuffle_generator,
-        )
+        train_loader, val_loader, _ = make_loaders(prepared, seed=SEED)
         model = BikeRentalNN(
             X_train_prepared.shape[1], config["hidden1"], config["hidden2"]
         )
         optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"])
         history = train_model(model, train_loader, val_loader, loss_fn, optimizer, args.epochs)
         histories[config["name"]] = history
+        if float(history["val_loss"].min()) < best_validation_loss:
+            best_validation_loss = float(history["val_loss"].min())
+            best_config = config
+            best_model = copy.deepcopy(model)
         best_row = history.loc[history["val_loss"].idxmin()]
         experiment_rows.append({
             "Run": config["name"],
@@ -252,6 +216,7 @@ def main():
         slug = config["name"].lower().replace(" ", "_")
         history.to_csv(reports / f"history_{slug}.csv", index=False)
         if config["name"] == "Main":
+            history.to_csv(reports / "history.csv", index=False)
             plot_learning_curve(history, reports)
             nn_mse, nn_mae = run_epoch(model, val_loader, loss_fn)
             comparison = pd.DataFrame({
@@ -267,17 +232,56 @@ def main():
                     nn_mse,
                 ],
             }).sort_values("Validation MAE").reset_index(drop=True)
+            main_baselines = comparison
             comparison.to_csv(reports / "baseline_comparison.csv", index=False)
             plot_baselines(comparison, reports)
             print("\nValidation baseline comparison:\n", comparison.round(4).to_string(index=False))
 
     experiment_comparison = pd.DataFrame(experiment_rows)
+    experiment_comparison.to_csv(reports / "experiments.csv", index=False)
     experiment_comparison.to_csv(reports / "experiment_comparison.csv", index=False)
     print("\nExperiment comparison:\n", experiment_comparison.round(4).to_string(index=False))
     best = experiment_comparison.loc[experiment_comparison["Validation Loss"].idxmin()]
     print(f"\nBest validation configuration: {best['Run']} (epoch {best['Best Epoch']})")
     print(f"Reports saved in: {reports}")
-    print("Held-out test rows were not evaluated.")
+    # Final evaluation: only now, after selecting the best model on validation.
+    assert best_model is not None and best_config is not None
+    _, _, test_loader = make_loaders(prepared, seed=SEED)
+    test_mse, test_mae = run_epoch(best_model, test_loader, loss_fn)
+    test_mean_predictions = np.full(len(y_test), y_train.mean())
+    test_linear_predictions = linear_model.predict(prepared["X_test"])
+    metrics = {
+        "seed": SEED,
+        "epochs_per_run": args.epochs,
+        "rows": {"train": len(y_train), "validation": len(y_val), "test": len(y_test)},
+        "selected_model": best_config["name"],
+        "selected_hidden_layers": [best_config["hidden1"], best_config["hidden2"]],
+        "selected_learning_rate": best_config["lr"],
+        "selected_best_epoch": int(best["Best Epoch"]),
+        "selected_validation_mse": float(best["Validation Loss"]),
+        "selected_validation_mae": float(best["Validation MAE"]),
+        "validation_baselines": {
+            row["Model"]: {
+                "mse": float(row["Validation MSE"]),
+                "mae": float(row["Validation MAE"]),
+            }
+            for _, row in main_baselines.iterrows()
+        },
+        "test": {
+            "neural_network": {"mse": test_mse, "mae": test_mae},
+            "training_mean": {
+                "mse": float(mean_squared_error(y_test, test_mean_predictions)),
+                "mae": float(mean_absolute_error(y_test, test_mean_predictions)),
+            },
+            "linear_regression": {
+                "mse": float(mean_squared_error(y_test, test_linear_predictions)),
+                "mae": float(mean_absolute_error(y_test, test_linear_predictions)),
+            },
+        },
+    }
+    (reports / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    print(f"Final held-out test MAE ({best_config['name']}): {test_mae:.4f} rentals")
+    print("Saved reports/metrics.json (test evaluated only after model selection).")
 
 
 if __name__ == "__main__":
