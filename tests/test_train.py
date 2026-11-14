@@ -268,3 +268,48 @@ def test_network_can_memorize_small_batch():
 
     # Final loss must be below 10% of initial loss.
     assert final_loss < initial_loss * 0.10
+
+
+def test_training_clears_gradients_each_batch():
+    torch.manual_seed(42)
+
+    model = nn.Linear(1, 1)
+    dataset = BikeRentalDataset(
+        np.ones((4, 1)),
+        np.ones(4),
+    )
+
+    # Two batches, requiring two optimizer steps.
+    loader = DataLoader(
+        dataset,
+        batch_size=2,
+        shuffle=False,
+    )
+
+    class TrackingSGD(torch.optim.SGD):
+        def __init__(self, parameters):
+            super().__init__(parameters, lr=0.01)
+            self.zero_grad_calls = 0
+            self.step_calls = 0
+
+        def zero_grad(self, *args, **kwargs):
+            self.zero_grad_calls += 1
+            return super().zero_grad(*args, **kwargs)
+
+        def step(self, *args, **kwargs):
+            self.step_calls += 1
+            return super().step(*args, **kwargs)
+
+    optimizer = TrackingSGD(model.parameters())
+
+    train.run_epoch(
+        model,
+        loader,
+        nn.MSELoss(),
+        optimizer,
+    )
+
+    # Every training batch must clear gradients and update weights.
+    assert optimizer.zero_grad_calls == len(loader)
+    assert optimizer.step_calls == len(loader)
+
