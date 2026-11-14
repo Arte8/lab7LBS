@@ -86,7 +86,13 @@ Three configurations were trained for 100 epochs using the same split, preproces
 
 *Results shown are from the completed 100-epoch `python train.py` run. Earlier interactive notebook results may differ because training runs consumed random-number state in a different order.*
 
+Main: The network achieved a validation MAE of 3.3687 rentals. Its best epoch was 100, suggesting it may have continued improving with additional training.
+
+Lower Learning Rate: The higher training and validation losses suggest slower convergence within the 100-epoch training budget.
+
 The **larger hidden layer** achieved the lowest validation loss and validation MAE. Its MAE was approximately **22.6% lower** than the main configuration (2.6079 versus 3.3687 rentals). Lowering the learning rate worsened performance over the fixed 100-epoch budget; both the main and lower-learning-rate runs had their best epoch at 100, so they may still have been improving when training ended. The larger network was selected using validation loss, not the held-out test set.
+
+Conclusion: Increasing the first hidden layer from 64 to 128 neurons improved validation performance. The larger network was selected based on validation metrics rather than held-out test performance.
 
 Detailed results are saved in [`reports/experiment_comparison.csv`](reports/experiment_comparison.csv), with per-epoch histories in `reports/history_*.csv`.
 
