@@ -11,6 +11,7 @@ target-version = "py312"
 line-length = 100
 include = ["*.py", "*.pyi", "pyproject.toml"]
 exclude = [".git", ".pytest_cache", "__pycache__", ".venv", "reports"]
+src = [".", "tests"]
 
 [tool.ruff.lint]
 # Syntax/undefined-name checks and high-confidence pycodestyle errors.
