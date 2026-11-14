@@ -52,8 +52,10 @@ def test_split_is_60_20_20_and_disjoint():
 def test_preprocessor_uses_training_data_and_eight_features(small_data):
     _, X, _ = small_data
     preprocessor = ColumnTransformer(
-        [("num", StandardScaler(), NUMERIC_FEATURES),
-         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES)],
+        [
+            ("num", StandardScaler(), NUMERIC_FEATURES),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
+        ],
         sparse_threshold=0,
     )
     transformed = preprocessor.fit_transform(X.iloc[:90])
@@ -67,7 +69,11 @@ def test_preprocessor_uses_training_data_and_eight_features(small_data):
 def test_network_architecture_and_output_shape(hidden1, hidden2):
     model = train.BikeRentalNN(8, hidden1, hidden2)
     layers = list(model.network)
-    assert [layer.out_features for layer in layers if isinstance(layer, nn.Linear)] == [hidden1, hidden2, 1]
+    assert [layer.out_features for layer in layers if isinstance(layer, nn.Linear)] == [
+        hidden1,
+        hidden2,
+        1,
+    ]
     assert sum(isinstance(layer, nn.ReLU) for layer in layers) == 2
     assert isinstance(layers[-1], nn.Linear)  # no output activation
     assert model(torch.zeros(4, 8)).shape == (4, 1)
@@ -130,8 +136,6 @@ def test_empty_loader_raises_value_error():
         train.run_epoch(nn.Linear(1, 1), loader, nn.MSELoss())
 
 
-
-
 def test_best_validation_epoch_weights_are_restored(monkeypatch):
     model = nn.Linear(1, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -146,10 +150,12 @@ def test_best_validation_epoch_weights_are_restored(monkeypatch):
                 model_arg.weight.fill_(value)
                 model_arg.bias.fill_(value)
 
-            saved_weights.append({
-                name: parameter.detach().clone()
-                for name, parameter in model_arg.named_parameters()
-            })
+            saved_weights.append(
+                {
+                    name: parameter.detach().clone()
+                    for name, parameter in model_arg.named_parameters()
+                }
+            )
             return 1.0, 1.0
 
         return next(losses), 1.0
@@ -179,24 +185,21 @@ def test_best_validation_epoch_weights_are_restored(monkeypatch):
     assert history["val_loss"].tolist() == [5.0, 2.0, 4.0]
     assert history["val_mae"].tolist() == [1.0, 1.0, 1.0]
 
-    best_epoch = int(
-        history.loc[history["val_loss"].idxmin(), "epoch"]
-    )
+    best_epoch = int(history.loc[history["val_loss"].idxmin(), "epoch"])
     assert best_epoch == 2
 
     for name, parameter in model.named_parameters():
-        assert torch.equal(
-            parameter, saved_weights[1][name]
-        ), f"{name} was not restored correctly"
+        assert torch.equal(parameter, saved_weights[1][name]), f"{name} was not restored correctly"
 
-   
 
 def test_training_mean_and_linear_baselines_use_validation_rows(small_data):
     _, X, y = small_data
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=train.SEED)
     prep = ColumnTransformer(
-        [("num", StandardScaler(), NUMERIC_FEATURES),
-         ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES)],
+        [
+            ("num", StandardScaler(), NUMERIC_FEATURES),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
+        ],
         sparse_threshold=0,
     )
     x_train = prep.fit_transform(X_train)
@@ -209,12 +212,14 @@ def test_training_mean_and_linear_baselines_use_validation_rows(small_data):
 
 
 def test_plot_files_are_created(tmp_path):
-    history = pd.DataFrame({
-        "epoch": [1, 2, 3],
-        "train_loss": [5.0, 3.0, 2.0],
-        "val_loss": [6.0, 2.0, 4.0],
-        "val_mae": [2.0, 1.0, 1.5],
-    })
+    history = pd.DataFrame(
+        {
+            "epoch": [1, 2, 3],
+            "train_loss": [5.0, 3.0, 2.0],
+            "val_loss": [6.0, 2.0, 4.0],
+            "val_mae": [2.0, 1.0, 1.5],
+        }
+    )
     train.plot_learning_curve(history, tmp_path)
     assert (tmp_path / "learning_curves.png").stat().st_size > 0
     assert (tmp_path / "validation_mae.png").stat().st_size > 0
@@ -248,20 +253,14 @@ def test_network_can_memorize_small_batch():
     loss_fn = nn.MSELoss()
 
     # Measure loss before training.
-    initial_loss, _ = train.run_epoch(
-        model, loader, loss_fn
-    )
+    initial_loss, _ = train.run_epoch(model, loader, loss_fn)
 
     # Train on the same batch for 400 optimizer steps.
     for _ in range(400):
-        train.run_epoch(
-            model, loader, loss_fn, optimizer
-        )
+        train.run_epoch(model, loader, loss_fn, optimizer)
 
     # Measure loss after training.
-    final_loss, _ = train.run_epoch(
-        model, loader, loss_fn
-    )
+    final_loss, _ = train.run_epoch(model, loader, loss_fn)
 
     print(f"Initial loss: {initial_loss:.6f}")
     print(f"Final loss: {final_loss:.6f}")
@@ -312,4 +311,3 @@ def test_training_clears_gradients_each_batch():
     # Every training batch must clear gradients and update weights.
     assert optimizer.zero_grad_calls == len(loader)
     assert optimizer.step_calls == len(loader)
-

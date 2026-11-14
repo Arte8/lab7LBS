@@ -4,6 +4,7 @@ Run from the project directory: python train.py
 Requires the instructor-supplied bikes_data.py beside this file.
 The held-out test set is evaluated once after validation-based selection.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -13,6 +14,7 @@ import random
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,7 +28,8 @@ from bikes_data import make_rentals
 from model import BikeRentalNN
 from prepare import (
     SEED,
-    make_loaders, prepare_data,
+    make_loaders,
+    prepare_data,
 )
 
 EXPERIMENTS = [
@@ -79,12 +82,14 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, epochs=100)
     for epoch in range(1, epochs + 1):
         train_loss, _ = run_epoch(model, train_loader, loss_fn, optimizer)
         val_loss, val_mae = run_epoch(model, val_loader, loss_fn)
-        history.append({
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "val_loss": val_loss,
-            "val_mae": val_mae,
-        })
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "val_mae": val_mae,
+            }
+        )
         if val_loss < best_loss:
             best_loss = val_loss
             best_epoch = epoch
@@ -170,10 +175,7 @@ def main():
     y_train, y_val, y_test = (prepared[k] for k in ("y_train", "y_val", "y_test"))
     X_train_prepared = prepared["X_train"]
     X_val_prepared = prepared["X_val"]
-    print(
-        f"Rows: train={len(y_train)}, validation={len(y_val)}, "
-        f"held-out test={len(y_test)}"
-    )
+    print(f"Rows: train={len(y_train)}, validation={len(y_val)}, held-out test={len(y_test)}")
     loss_fn = nn.MSELoss()
 
     # Both baselines use exactly the same training and validation rows.
@@ -194,9 +196,7 @@ def main():
         # An independent generator ensures identical training batch order for
         # runs with the same number of samples and batch size.
         train_loader, val_loader, _ = make_loaders(prepared, seed=SEED)
-        model = BikeRentalNN(
-            X_train_prepared.shape[1], config["hidden1"], config["hidden2"]
-        )
+        model = BikeRentalNN(X_train_prepared.shape[1], config["hidden1"], config["hidden2"])
         optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"])
         history = train_model(model, train_loader, val_loader, loss_fn, optimizer, args.epochs)
         histories[config["name"]] = history
@@ -205,33 +205,41 @@ def main():
             best_config = config
             best_model = copy.deepcopy(model)
         best_row = history.loc[history["val_loss"].idxmin()]
-        experiment_rows.append({
-            "Run": config["name"],
-            "Hidden Layers": f"{config['hidden1']}, {config['hidden2']}",
-            "Learning Rate": config["lr"],
-            "Best Epoch": int(best_row["epoch"]),
-            "Validation Loss": float(best_row["val_loss"]),
-            "Validation MAE": float(best_row["val_mae"]),
-        })
+        experiment_rows.append(
+            {
+                "Run": config["name"],
+                "Hidden Layers": f"{config['hidden1']}, {config['hidden2']}",
+                "Learning Rate": config["lr"],
+                "Best Epoch": int(best_row["epoch"]),
+                "Validation Loss": float(best_row["val_loss"]),
+                "Validation MAE": float(best_row["val_mae"]),
+            }
+        )
         slug = config["name"].lower().replace(" ", "_")
         history.to_csv(reports / f"history_{slug}.csv", index=False)
         if config["name"] == "Main":
             history.to_csv(reports / "history.csv", index=False)
             plot_learning_curve(history, reports)
             nn_mse, nn_mae = run_epoch(model, val_loader, loss_fn)
-            comparison = pd.DataFrame({
-                "Model": ["Training Mean", "Linear Regression", "Neural Network"],
-                "Validation MAE": [
-                    mean_absolute_error(y_val, mean_predictions),
-                    mean_absolute_error(y_val, linear_predictions),
-                    nn_mae,
-                ],
-                "Validation MSE": [
-                    mean_squared_error(y_val, mean_predictions),
-                    mean_squared_error(y_val, linear_predictions),
-                    nn_mse,
-                ],
-            }).sort_values("Validation MAE").reset_index(drop=True)
+            comparison = (
+                pd.DataFrame(
+                    {
+                        "Model": ["Training Mean", "Linear Regression", "Neural Network"],
+                        "Validation MAE": [
+                            mean_absolute_error(y_val, mean_predictions),
+                            mean_absolute_error(y_val, linear_predictions),
+                            nn_mae,
+                        ],
+                        "Validation MSE": [
+                            mean_squared_error(y_val, mean_predictions),
+                            mean_squared_error(y_val, linear_predictions),
+                            nn_mse,
+                        ],
+                    }
+                )
+                .sort_values("Validation MAE")
+                .reset_index(drop=True)
+            )
             main_baselines = comparison
             comparison.to_csv(reports / "baseline_comparison.csv", index=False)
             plot_baselines(comparison, reports)

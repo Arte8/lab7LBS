@@ -1,4 +1,5 @@
 """Tests for deterministic splits, leakage prevention and DataLoaders."""
+
 import numpy as np
 import pandas as pd
 import torch
@@ -68,6 +69,7 @@ def test_loader_shuffle_only_for_training(small_frame):
     assert isinstance(train.sampler, RandomSampler)
     assert isinstance(val.sampler, SequentialSampler)
     assert isinstance(test.sampler, SequentialSampler)
+
 
 def test_training_loader_reproducible_shuffle(small_frame):
     prepared = prepare_data(small_frame)

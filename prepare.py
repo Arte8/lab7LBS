@@ -1,4 +1,5 @@
 """Training-only preparation and PyTorch datasets for Lakeshore Bike Share."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -55,9 +56,15 @@ def prepare_data(df, seed=SEED):
     X_test_p = preprocessor.transform(X_test)
     return {
         "preprocessor": preprocessor,
-        "train_rows": train, "val_rows": validation, "test_rows": test,
-        "X_train": X_train_p, "X_val": X_val_p, "X_test": X_test_p,
-        "y_train": y_train, "y_val": y_val, "y_test": y_test,
+        "train_rows": train,
+        "val_rows": validation,
+        "test_rows": test,
+        "X_train": X_train_p,
+        "X_val": X_val_p,
+        "X_test": X_test_p,
+        "y_train": y_train,
+        "y_val": y_val,
+        "y_test": y_test,
     }
 
 
@@ -65,14 +72,18 @@ def make_loaders(prepared, seed=SEED, batch_size=BATCH_SIZE):
     generator = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
         BikeRentalDataset(prepared["X_train"], prepared["y_train"]),
-        batch_size=batch_size, shuffle=True, generator=generator,
+        batch_size=batch_size,
+        shuffle=True,
+        generator=generator,
     )
     val_loader = DataLoader(
         BikeRentalDataset(prepared["X_val"], prepared["y_val"]),
-        batch_size=batch_size, shuffle=False,
+        batch_size=batch_size,
+        shuffle=False,
     )
     test_loader = DataLoader(
         BikeRentalDataset(prepared["X_test"], prepared["y_test"]),
-        batch_size=batch_size, shuffle=False,
+        batch_size=batch_size,
+        shuffle=False,
     )
     return train_loader, val_loader, test_loader
