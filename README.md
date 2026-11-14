@@ -110,6 +110,11 @@ The model weights from this best epoch were restored after training to avoid ret
 
 ![Validation MAE across epochs](reports/validation_mae.png)
 
+Model	Validation MAE	Validation MSE
+Training Mean	From CSV	From CSV
+Linear Regression	From CSV	From CSV
+Neural Network (selected)	2.6079	15.3439
+
 ## Neural Network Experiment Comparison
 
 Three configurations were trained for 100 epochs using the same split, preprocessing, loss function, optimizer type, and validation-selection rule. Each additional run changes **only one hyperparameter** relative to the main run.
