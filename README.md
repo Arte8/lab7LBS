@@ -4,6 +4,42 @@ Lab 7 — Capstone Preparation, Humber College AIGC5005.
 
 This project predicts hourly bike rentals for the synthetic Lakeshore Bike Share dataset using a PyTorch neural network. It compares the network with two simple baselines, tracks learning across epochs, and evaluates controlled hyperparameter experiments.
 
+
+## How to run it
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Arte8/lab7LBS.git
+cd lab7LBS
+```
+
+Create and activate the Conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate lab7-lbs
+```
+
+Train the model and generate reports:
+
+```bash
+python train.py
+```
+
+Run automated tests:
+
+```bash
+python -m pytest -v
+```
+
+Check code quality:
+
+```bash
+python -m ruff check .
+```
+
+
 ## Linear Relationship Assessment
 
 The relationship between hour of day and bike rentals is nonlinear. Rental demand tends to peak during morning and evening commuting hours and decrease during quieter periods.
