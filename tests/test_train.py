@@ -218,3 +218,53 @@ def test_plot_files_are_created(tmp_path):
     train.plot_learning_curve(history, tmp_path)
     assert (tmp_path / "learning_curves.png").stat().st_size > 0
     assert (tmp_path / "validation_mae.png").stat().st_size > 0
+
+
+def test_network_can_memorize_small_batch():
+    torch.manual_seed(42)
+
+    # Create a small, deterministic regression dataset.
+    X = torch.linspace(-1, 1, 16).reshape(-1, 1)
+    y = 2.5 * X - 0.75
+
+    dataset = BikeRentalDataset(
+        X.numpy(),
+        y.flatten().numpy(),
+    )
+
+    loader = DataLoader(
+        dataset,
+        batch_size=16,
+        shuffle=False,
+    )
+
+    # Use the actual Lab 7 neural network.
+    model = train.BikeRentalNN(1, 32, 16)
+
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=0.01,
+    )
+    loss_fn = nn.MSELoss()
+
+    # Measure loss before training.
+    initial_loss, _ = train.run_epoch(
+        model, loader, loss_fn
+    )
+
+    # Train on the same batch for 400 optimizer steps.
+    for _ in range(400):
+        train.run_epoch(
+            model, loader, loss_fn, optimizer
+        )
+
+    # Measure loss after training.
+    final_loss, _ = train.run_epoch(
+        model, loader, loss_fn
+    )
+
+    print(f"Initial loss: {initial_loss:.6f}")
+    print(f"Final loss: {final_loss:.6f}")
+
+    # Final loss must be below 10% of initial loss.
+    assert final_loss < initial_loss * 0.10
